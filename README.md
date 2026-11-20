@@ -1,0 +1,208 @@
+# desafio_teste_domino
+
+Casos de teste para o desafio **Dominó** da disciplina Projeto, Implementação e
+Teste de Software — 2026.
+
+**Colaborador:** Gabriel de Oliveira Gnoatto — RA 23298801-2 (individual).
+
+## 1. Especificação do desafio
+
+O enunciado em `desafios.md` diz apenas:
+
+> **Dominó**
+> - casos de teste para testar uma partida para 02 jogadores;
+> - casos de teste em Javascript para testar Javascript;
+
+**Ele não define variante, peças, turnos nem critérios de vitória.** As regras
+abaixo são, portanto, **premissas explícitas** adotadas para tornar os casos
+verificáveis. Foram confirmadas antes da escrita e estão registradas aqui e no
+`.docx` para que o professor possa ajustá-las se usar outra variante.
+
+### 1.1 Variante e equipamento
+
+- **Double-six:** 28 peças, do `[0,0]` ao `[6,6]`, incluindo as sete duplas.
+- 2 jogadores; **7 peças** por jogador e **14 peças no monte**.
+- **Jogador 0 começa**, fixo nos dados de teste — não há sorteio nem
+  aleatoriedade em nenhum caso.
+
+### 1.2 Estado recebido
+
+```js
+{
+  maos: [ [[0,1],[2,2],...], [[3,4],[5,5],...] ], // mãos dos jogadores 0 e 1
+  monte: [ [6,6],[1,3],... ],                      // peças disponíveis à esquerda
+  mesa:  [ [2,4],[4,0],... ] | [],                 // fileira jogada; vazia no início
+  jogador: 0 | 1                                   // jogador da vez
+}
+```
+
+- As pontas da mesa são `mesa[0][0]` (esquerda) e `mesa[mesa.length - 1][1]`
+  (direita). Com a mesa vazia, qualquer peça pode ser a primeira.
+- Cada peça é um par `[a, b]` de números inteiros de `0` a `6`. `[a,b]` e `[b,a]`
+  são a **mesma peça**: a orientação é escolhida no momento do encaixe.
+- Duplas `[x,x]` são armazenadas na mesa como `[x,x]` e mantêm as duas pontas
+  em `x`. O contrato é plano e não representa orientação espacial.
+
+### 1.3 Regras de turno
+
+1. **Escolha da peça:** percorre-se a mão do jogador da vez da primeira à última
+   peça. A primeira que encaixa é jogada.
+2. **Ordem de tentativa** para cada peça (premissa de determinismo):
+   1. ponta direita sem inverter (`peca[0] === pontaDir`);
+   2. ponta direita invertendo (`peca[1] === pontaDir`);
+   3. ponta esquerda sem inverter (`peca[1] === pontaEsq`);
+   4. ponta esquerda invertendo (`peca[0] === pontaEsq`).
+   A peça é sempre armazenada na mesa na orientação em que foi encaixada.
+3. **Compra:** se nenhuma peça da mão encaixa e o monte não está vazio, o jogador
+   compra **exatamente a primeira peça do monte** (`monte[0]`). Se ela encaixar,
+   é jogada no mesmo turno; se não encaixar, a vez passa.
+4. **Passagem:** se nenhuma peça encaixa e o monte está vazio, a vez passa ao
+   outro jogador.
+5. **Vitória:** ao esgotar a mão, o jogador vence e a partida termina.
+6. **Bloqueio:** se o jogador da vez não tem jogada, o monte está vazio e o outro
+   jogador também não tem jogada, a partida termina. Vence quem tiver a **menor
+   soma de pontos** nas peças restantes; empate na soma = empate.
+7. A função **não altera** o estado recebido.
+
+**Vitória com peça comprada é impossível** sob estas regras: a compra acrescenta
+uma peça à mão e a jogada remove uma, de modo que a mão só esvazia se já estivesse
+vazia antes da compra. O CT-30 fixa esse comportamento (evento `jogada`, não `fim`).
+
+### 1.4 Contrato JavaScript
+
+```js
+const { jogarDomino } = require('./src/domino');
+```
+
+`jogarDomino(estado)` processa **um turno** e devolve um novo objeto:
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `maos` | array[2] | mãos após o turno (cópias novas) |
+| `monte` | array | monte após o turno |
+| `mesa` | array | mesa após o turno |
+| `jogador` | 0 \| 1 | jogador da vez seguinte |
+| `evento` | `'jogada'` \| `'passou'` \| `'fim'` \| `'erro'` | o que aconteceu |
+| `peca` | `[a,b]` \| `null` | peça jogada, se houver |
+| `vencedor` | 0 \| 1 \| `null` | vencedor, somente em `fim` |
+| `motivo` | string | `'jogada'`, `'sem joga'`, `'vitoria'`, `'bloqueio'` ou descrição de erro |
+| `comprou` | boolean | se houve compra do monte neste turno |
+
+Em `evento: 'fim'`, o campo `jogador` permanece com o índice de quem causou o
+fim (não avança), pois a partida terminou.
+
+Um **estado inválido** (campos ausentes, tipos errados, peça fora de `0..6`,
+`jogador` diferente de `0`/`1`) devolve `{ evento: 'erro', motivo: <string> }`
+e não altera nada.
+
+## 2. Funcionamento dos casos de teste
+
+Os casos estão em
+[`casos_de_teste_domino.docx`](casos_de_teste_domino.docx), no padrão do
+template oficial (`aulas/SEMANA 02/docs/Caso de Teste.docx`). Cada caso contém
+**Descrição**, **Pré-condições**, **Passos**, **Cenário 1** com **Dados de
+Teste** e **Resultado Esperado**, e **Pós-condições**.
+
+Cada caso tem um teste equivalente em `test/domino.test.js`, com o mesmo ID
+(CT-01 a CT-38). O `.docx` é a especificação legível; o `.js` é a versão
+executável, atendendo a exigência "casos de teste em Javascript para testar
+Javascript".
+
+### Casos incluídos
+
+| ID | Objetivo | Evento esperado |
+|---|---|---|
+| CT-01 | Primeira jogada com mesa vazia | `jogada` |
+| CT-02 | Encaixe na ponta direita, sem inverter | `jogada` |
+| CT-03 | Encaixe na ponta direita, invertendo | `jogada` |
+| CT-04 | Encaixe na ponta esquerda, sem inverter | `jogada` |
+| CT-05 | Encaixe na ponta esquerda, invertendo | `jogada` |
+| CT-06 | Dupla jogada mantém as duas pontas | `jogada` |
+| CT-07 | Primeira peça jogável da mão tem prioridade | `jogada` |
+| CT-08 | Pontas iguais: tenta a direita antes da esquerda | `jogada` |
+| CT-09 | Sem jogada e monte vazio: passa a vez | `passou` |
+| CT-10 | Compra peça jogável e joga no mesmo turno | `jogada` |
+| CT-11 | Compra peça não jogável e passa a vez | `passou` |
+| CT-12 | Vitória ao esgotar a mão (jogador 0) | `fim` / `vitoria` |
+| CT-13 | Vitória ao esgotar a mão (jogador 1) | `fim` / `vitoria` |
+| CT-14 | Bloqueio: menor soma de pontos vence | `fim` / `bloqueio` |
+| CT-15 | Bloqueio com somas iguais: empate | `fim` / `bloqueio` |
+| CT-16 | Estado recebido não é alterado | `jogada` |
+| CT-17 | Outra partida válida (não derivada dos anteriores) | `jogada` |
+| CT-18 | Peça com valor `7` fora do domínio | `erro` |
+| CT-19 | Peça com valor negativo | `erro` |
+| CT-20 | Peça com valor decimal `1.5` | `erro` |
+| CT-21 | Peça não é um par de dois números | `erro` |
+| CT-22 | `jogador` diferente de `0`/`1` | `erro` |
+| CT-23 | `maos` não é um par de arrays | `erro` |
+| CT-24 | Entrada `null` | `erro` |
+| CT-25 | Campo `mesa` ausente | `erro` |
+| CT-26 | Campo `monte` ausente | `erro` |
+| CT-27 | Campo `jogador` ausente | `erro` |
+| CT-28 | Campo `maos` ausente | `erro` |
+| CT-29 | Compra que encaixa à esquerda | `jogada` |
+| CT-30 | Compra não zera a mão (não gera vitória) | `jogada` |
+| CT-31 | Bloqueio após compra que esvazia o monte | `fim` / `bloqueio` |
+| CT-32 | Peça inválida na `mesa` | `erro` |
+| CT-33 | Peça inválida no `monte` | `erro` |
+| CT-34 | `jogador` como string `"0"` | `erro` |
+| CT-35 | `maos` com 3 elementos | `erro` |
+| CT-36 | Peça com `NaN` | `erro` |
+| CT-37 | Peça com booleano | `erro` |
+| CT-38 | Distribuição completa 7 / 7 / 14 | `jogada` |
+
+### Cobertura das regras
+
+| Regra / premissa | Casos que a cobrem |
+|---|---|
+| Mesa vazia / primeira peça | CT-01 |
+| Encaixe na direita (com e sem inversão) | CT-02, CT-03, CT-08 |
+| Encaixe na esquerda (com e sem inversão) | CT-04, CT-05 |
+| Duplas | CT-06 |
+| Ordem de escolha determinística | CT-07, CT-08 |
+| Passagem | CT-09, CT-11 |
+| Compra do monte | CT-10, CT-11, CT-29, CT-30, CT-31 |
+| Vitória | CT-12, CT-13 |
+| Bloqueio e soma de pontos | CT-14, CT-15, CT-31 |
+| Não mutação | CT-16 (e verificação automática em todos os casos) |
+| Caminho válido independente | CT-17 |
+| Distribuição 7 / 7 / 14 | CT-38 |
+| Validação de estado | CT-18 a CT-28, CT-32 a CT-37 |
+
+### Casos executáveis em JavaScript
+
+- **Runner:** `node --test` (nativo do Node.js 18+), sem dependências.
+- **Executar:** `npm test` na raiz do repositório.
+- **Situação atual:** os 38 testes existem e falham (`# fail 38`) com a mensagem
+  "Crie src/domino.js exportando jogarDomino" seguida do erro real de carregamento
+  (stack), para não esconder falhas no `require`. Esse é o estado **RED** esperado:
+  a IA deve gerar a implementação a partir dos casos, sem que este repositório
+  entregue o código do jogo.
+- **Determinismo:** nenhum caso usa `Math.random`, sorteio ou tempo. Todos os
+  dados (mãos, monte, mesa e jogador) estão fixos no próprio caso.
+
+### Premissas que podem ser revisadas
+
+Se o professor adotar outra variante, estes pontos precisam mudar em conjunto:
+número de peças e tamanho das mãos (1.1, exercitado no CT-38 com as 28 peças),
+ordem de prioridade do encaixe (1.3.2), compra de uma peça por turno (1.3.3) e
+critério de bloqueio (1.3.6). A representação plana da dupla (1.2) decorre do
+contrato e não depende da variante.
+
+## 3. Estrutura do repositório
+
+```
+desafio_teste_domino/
+├── README.md
+├── package.json
+├── casos_de_teste_domino.docx
+└── test/
+    └── domino.test.js
+```
+
+Não há implementação do jogo neste repositório: o entregável é a especificação
+dos casos (`.docx`) e sua versão executável em JavaScript (`test/`).
+
+## 4. Colaboradores
+
+- Gabriel de Oliveira Gnoatto — RA 23298801-2
