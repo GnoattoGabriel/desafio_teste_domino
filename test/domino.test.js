@@ -1659,6 +1659,16 @@ verifica('CT-40', 'distribuicao reproduzivel com gerador fixo e erro com gerador
       'CT-40: jogadorInicial 1');
     assert.equal(criarPartida({ jogadorInicial: 2 }).valida, false,
       'CT-40: jogadorInicial fora de 0/1');
+    const baralhoValido = [
+      ...saida.estado.maos[0],
+      ...saida.estado.maos[1],
+      ...saida.estado.monte
+    ];
+    const conflito = criarPartida({ baralho: baralhoValido, gerador: (d) => d });
+    assert.equal(conflito.valida, false, 'CT-40: baralho e gerador sao exclusivos');
+    assert.equal(conflito.estado, null, 'CT-40: sem estado com opcoes conflitantes');
+    assert.ok(typeof conflito.motivo === 'string' && conflito.motivo.length > 0,
+      'CT-40: motivo descritivo para opcoes conflitantes');
   }
 });
 

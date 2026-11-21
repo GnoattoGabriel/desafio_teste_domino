@@ -116,10 +116,10 @@ const { valida, estado, motivo } = criarPartida({ baralho, gerador, jogadorInici
 - `baralho`: opcional, as 28 peças em **ordem fixa**. As primeiras 7 formam a
   mão 0, as seguintes 7 a mão 1 e as 14 restantes o monte (CT-38, CT-39).
 - `gerador`: alternativa a `baralho`; função `(baralhoCanonico) => baralho`,
-  chamada uma única vez. `baralho` e `gerador` são mutuamente exclusivos.
-  Gerador que não é função, baralho com tamanho/peças inválidos ou peças
-  repetidas produzem `valida: false`, `estado: null` e `motivo` descritivo
-  (CT-40).
+  chamada uma única vez. `baralho` e `gerador` são mutuamente exclusivos:
+  informar os dois ao mesmo tempo, com um gerador que não é função, com um
+  baralho de tamanho/peças inválidos ou com peças repetidas produz
+  `valida: false`, `estado: null` e `motivo` descritivo (CT-40).
 - `jogadorInicial`: `0` (padrão) ou `1`; qualquer outro valor é erro (CT-40).
 - Sem opções, usa o baralho canônico ordenado de `[0,0]` a `[6,6]`. Não há
   `Math.random`, relógio nem sorteio: o mesmo gerador sempre entrega a mesma
