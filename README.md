@@ -46,7 +46,7 @@ verificáveis. Foram confirmadas antes da escrita e estão registradas aqui e no
   numa ponta `x`, ela é considerada **colocada na perpendicular**: a ponta
   atingida continua `x` e o retorno inclui `orientacao: 'perpendicular'`. Na
   primeira peça (mesa vazia) e nas peças comuns, `orientacao` é `'linear'`. A
-  peça continua plana; a orientação é um metadado do retorno (CT-50).
+  peça continua plana; a orientação é um metadado do retorno (CT-06, CT-50, CT-51).
 
 ### 1.3 Regras de turno
 
@@ -95,7 +95,7 @@ const { jogarDomino } = require('./src/domino');
 | `evento` | `'jogada'` \| `'passou'` \| `'fim'` \| `'erro'` | o que aconteceu |
 | `peca` | `[a,b]` \| `null` | peça jogada, se houver |
 | `vencedor` | 0 \| 1 \| `null` | vencedor, somente em `fim` |
-| `motivo` | string | `'jogada'`, `'sem joga'`, `'vitoria'`, `'bloqueio'` ou descrição de erro |
+| `motivo` | string | `'jogada'`, `'sem joga'`, `'vitoria'`, `'bloqueio'` ou um dos motivos de erro de 1.6 |
 | `comprou` | boolean | se houve compra do monte neste turno |
 | `orientacao` | `'linear'` \| `'perpendicular'` \| `null` | como a peça foi encaixada; dupla na perpendicular |
 
@@ -103,8 +103,8 @@ Em `evento: 'fim'`, o campo `jogador` permanece com o índice de quem causou o
 fim (não avança), pois a partida terminou.
 
 Um **estado inválido** (campos ausentes, tipos errados, peça fora de `0..6`,
-`jogador` diferente de `0`/`1`) devolve `{ evento: 'erro', motivo: <string> }`
-e não altera nada.
+`jogador` diferente de `0`/`1`, `vencedor` fora de `0`/`1`/`null`) devolve
+`{ evento: 'erro', motivo: 'estado invalido', ... }` e não altera nada.
 
 ### 1.5 Distribuição inicial
 
@@ -119,14 +119,34 @@ const { valida, estado, motivo } = criarPartida({ baralho, gerador, jogadorInici
   chamada uma única vez. `baralho` e `gerador` são mutuamente exclusivos:
   informar os dois ao mesmo tempo, com um gerador que não é função, com um
   baralho de tamanho/peças inválidos ou com peças repetidas produz
-  `valida: false`, `estado: null` e `motivo` descritivo (CT-40).
+  `valida: false`, `estado: null` e `motivo: 'baralho invalido'` (CT-40, CT-52).
 - `jogadorInicial`: `0` (padrão) ou `1`; qualquer outro valor é erro (CT-40).
-- Sem opções, usa o baralho canônico ordenado de `[0,0]` a `[6,6]`. Não há
+- Sem opções — inclusive `criarPartida()` sem argumentos — usa o baralho
+  canônico ordenado de `[0,0]` a `[6,6]` (CT-54). Não há
   `Math.random`, relógio nem sorteio: o mesmo gerador sempre entrega a mesma
-  distribuição (CT-40).
+  distribuição, chamada exatamente uma vez (CT-40, CT-53).
 - O `estado` devolvido contém `maos`, `monte`, `mesa: []`, `jogador` e
   `vencedor: null`. Para encadear turnos, use `estado = jogarDomino(estado)`:
   o retorno já traz todos os campos do estado (CT-44 a CT-46).
+
+### 1.6 Vocabulário de `motivo`
+
+Os testes comparam `motivo` por valor. As strings permitidas são:
+
+| Situação | `motivo` |
+|---|---|
+| Peça encaixada | `'jogada'` |
+| Passagem de vez | `'sem joga'` |
+| Fim por vitória | `'vitoria'` |
+| Fim por bloqueio | `'bloqueio'` |
+| Estado inválido (inclui peça fora de `0..6`, `vencedor` inválido e entrada `null`) | `'estado invalido'` |
+| Mão vazia no início do turno | `'mao vazia no inicio do turno'` |
+| Turno após `evento: 'fim'` | `'partida encerrada'` |
+| `criarPartida` com baralho/gerador inválidos | `'baralho invalido'` |
+
+`criarPartida` usa `motivo: ''` quando `valida: true`. Os motivos de erro de
+`criarPartida` fora da tabela acima (por exemplo `jogadorInicial` inválido)
+também são comparados por valor nos testes que os exercitam (CT-40).
 
 ## 2. Funcionamento dos casos de teste
 
@@ -137,7 +157,7 @@ template oficial (`aulas/SEMANA 02/docs/Caso de Teste.docx`). Cada caso contém
 Teste** e **Resultado Esperado**, e **Pós-condições**.
 
 Cada caso tem um teste equivalente em `test/domino.test.js`, com o mesmo ID
-(CT-01 a CT-50). O `.docx` é a especificação legível; o `.js` é a versão
+(CT-01 a CT-57). O `.docx` é a especificação legível; o `.js` é a versão
 executável, atendendo a exigência "casos de teste em Javascript para testar
 Javascript".
 
@@ -195,6 +215,13 @@ Javascript".
 | CT-48 | `monte`/`mesa` não-array e peças inválidas nesses campos | `erro` |
 | CT-49 | Mão vazia no início do turno | `erro` |
 | CT-50 | Dupla jogada na perpendicular | `jogada` / `perpendicular` |
+| CT-51 | Dupla encostada na ponta esquerda | `jogada` / `perpendicular` |
+| CT-52 | Baralho duplicado e baralho curto | `erro` / `baralho invalido` |
+| CT-53 | Gerador injetado chamado uma única vez | `valida: true` / contador 1 |
+| CT-54 | `criarPartida()` sem argumentos | `valida: true` / baralho canônico |
+| CT-55 | Evento de entrada diferente de `fim` | `jogada` |
+| CT-56 | `vencedor` fora de `0`/`1`/`null` | `erro` / `estado invalido` |
+| CT-57 | Vocabulário fechado de `motivo` | `erro` / motivo do vocabulário |
 
 ### Cobertura das regras
 
@@ -219,20 +246,27 @@ Javascript".
 | Simetria do jogador 1 | CT-13, CT-43 |
 | Partida encadeada | CT-44, CT-45, CT-46 |
 | Pós-fim | CT-47 |
-| Duplas na perpendicular | CT-06, CT-50 |
+| Duplas na perpendicular | CT-06, CT-50, CT-51 |
+| Baralho duplicado/curto e gerador | CT-40, CT-52, CT-53, CT-54 |
+| Evento de entrada | CT-47, CT-55 |
+| Vencedor inválido | CT-56 |
+| Vocabulário de erro | CT-18 a CT-28, CT-32 a CT-37, CT-48, CT-49, CT-52, CT-56, CT-57 |
 
 ### Casos executáveis em JavaScript
 
 - **Runner:** `node --test` (nativo do Node.js 18+), sem dependências.
 - **Executar:** `npm test` na raiz do repositório.
-- **Situação atual:** os 50 casos viram 53 testes (CT-48 tem quatro linhas) e
-  falham: `# tests 53`, `# pass 0`, `# fail 53`. Esse é o estado **RED**
+- **Situação atual:** os 57 casos viram 60 testes (CT-48 tem quatro linhas) e
+  falham: `# tests 60`, `# pass 0`, `# fail 60`. Esse é o estado **RED**
   esperado: a implementação do jogo não faz parte deste entregável. As mensagens
   citam `src/domino.js` e trazem o `stack` real de carregamento.
-- **Ciclo TDD:** o RED é registrado neste repositório; o GREEN (53/53) e a
+- **Ciclo TDD:** o RED é registrado neste repositório; o GREEN (60/60) e a
   refatoração foram executados em cópia descartável com implementação de
-  referência e variantes defeituosas (compra múltipla, distribuição alternada,
-  turno pós-fim, ausência de `orientacao`, mão vazia aceita). Nenhuma
+  referência e 10 variantes defeituosas (compra múltipla, distribuição
+  alternada, turno pós-fim, ausência de `orientacao`, mão vazia aceita, dupla
+  na esquerda sem perpendicular, baralho duplicado, gerador chamado duas vezes,
+  baralho padrão invertido, vencedor inválido, motivo fora do vocabulário e
+  mutação da mão). Todas as 10 variantes foram detectadas. Nenhuma
   implementação foi deixada aqui.
 - **Determinismo:** nenhum caso usa `Math.random`, sorteio ou tempo. As mãos, o
   monte, a mesa e o jogador estão fixos no caso; quando a distribuição é
@@ -240,14 +274,19 @@ Javascript".
   fixa (CT-40, CT-45, CT-46).
 - **Correção do helper:** `copia` preserva `NaN` e funções. O `JSON.stringify`
   original convertia `NaN` em `null` e já fazia o CT-36 falhar mesmo com a
-  implementação correta; a nova cópia também permite injetar `gerador`.
+  implementação correta; a nova cópia também permite injetar `gerador`. O
+  `motivo` é comparado **por valor** em todos os casos, inclusive nos de erro;
+  a checagem relaxada de "string não vazia" foi removida.
 
 ### Premissas que podem ser revisadas
 
 Se o professor adotar outra variante, estes pontos precisam mudar em conjunto:
 número de peças e tamanho das mãos (1.1, exercitado no CT-38 com as 28 peças),
 ordem de prioridade do encaixe (1.3.2), compra de uma peça por turno (1.3.3),
-critério de bloqueio (1.3.6) e o metadado `orientacao` das duplas (1.2 e CT-50).
+critério de bloqueio (1.3.6), o metadado `orientacao` das duplas (1.2,
+CT-50, CT-51), o vocabulário de `motivo` (1.6, CT-57), a validação de
+`vencedor` (CT-56) e a regra de que somente `evento: 'fim'` encerra o turno
+(1.3.8, CT-55).
 O monte do CT-31 foi corrigido para `[6,6]`: o baralho double-six tem cada peça
 uma única vez; o bloqueio e o vencedor 1 foram preservados (somas 25 e 7).
 

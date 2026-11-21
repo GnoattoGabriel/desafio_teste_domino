@@ -60,12 +60,7 @@ const verifica = (id, descricao, entrada, esperado, opcoes = {}) => {
     const saida = funcao(entrada);
     const checar = (atual, previsto) => {
       for (const [campo, valor] of Object.entries(previsto)) {
-        if (campo === 'motivo' && previsto.evento === 'erro') {
-          assert.equal(typeof atual.motivo, 'string', `${id}: motivo deve ser string`);
-          assert.ok(atual.motivo.length > 0, `${id}: motivo nao pode ser vazio`);
-        } else {
-          assert.deepEqual(atual[campo], valor, `${id}: campo ${campo}`);
-        }
+        assert.deepEqual(atual[campo], valor, `${id}: campo ${campo}`);
       }
     };
     checar(saida, esperado);
@@ -836,7 +831,8 @@ verifica('CT-18', 'rejeitar peca com valor 7', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-19', 'rejeitar peca com valor negativo', {
@@ -856,7 +852,8 @@ verifica('CT-19', 'rejeitar peca com valor negativo', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-20', 'rejeitar peca com valor decimal', {
@@ -876,7 +873,8 @@ verifica('CT-20', 'rejeitar peca com valor decimal', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-21', 'rejeitar peca que nao e um par de numeros', {
@@ -896,7 +894,8 @@ verifica('CT-21', 'rejeitar peca que nao e um par de numeros', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-22', 'rejeitar jogador diferente de 0 ou 1', {
@@ -916,7 +915,8 @@ verifica('CT-22', 'rejeitar jogador diferente de 0 ou 1', {
   mesa: [],
   jogador: 2
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-23', 'rejeitar maos que nao sao um par de arrays', {
@@ -932,11 +932,13 @@ verifica('CT-23', 'rejeitar maos que nao sao um par de arrays', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-24', 'rejeitar entrada nula', null, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 test('CT-16 — o estado recebido nao e alterado', () => {
@@ -984,7 +986,8 @@ verifica('CT-25', 'rejeitar estado sem o campo mesa', {
   ],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-26', 'rejeitar estado sem o campo monte', {
@@ -1004,7 +1007,8 @@ verifica('CT-26', 'rejeitar estado sem o campo monte', {
   ],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-27', 'rejeitar estado sem o campo jogador', {
@@ -1026,7 +1030,8 @@ verifica('CT-27', 'rejeitar estado sem o campo jogador', {
     [2, 5]
   ]
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-28', 'rejeitar estado sem o campo maos', {
@@ -1039,7 +1044,8 @@ verifica('CT-28', 'rejeitar estado sem o campo maos', {
   ],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-29', 'comprar peca jogável e encaixá-la à esquerda', {
@@ -1192,7 +1198,8 @@ verifica('CT-32', 'rejeitar peca inválida na mesa', {
   ],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-33', 'rejeitar peca inválida no monte', {
@@ -1210,7 +1217,8 @@ verifica('CT-33', 'rejeitar peca inválida no monte', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-34', 'rejeitar jogador do tipo texto', {
@@ -1228,7 +1236,8 @@ verifica('CT-34', 'rejeitar jogador do tipo texto', {
   mesa: [],
   jogador: '0'
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-35', 'rejeitar maos com tres elementos', {
@@ -1249,7 +1258,8 @@ verifica('CT-35', 'rejeitar maos com tres elementos', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-36', 'rejeitar peca com nan', {
@@ -1269,7 +1279,8 @@ verifica('CT-36', 'rejeitar peca com nan', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-37', 'rejeitar peca booleana', {
@@ -1289,7 +1300,8 @@ verifica('CT-37', 'rejeitar peca booleana', {
   mesa: [],
   jogador: 0
 }, {
-  evento: 'erro'
+  evento: 'erro',
+  motivo: 'estado invalido'
 });
 
 verifica('CT-38', 'jogar com a distribuicao completa 7 / 7 / 14', {
@@ -1653,8 +1665,8 @@ verifica('CT-40', 'distribuicao reproduzivel com gerador fixo e erro com gerador
     const invalido = criarPartida({ gerador: null });
     assert.equal(invalido.valida, false, 'CT-40: gerador invalido');
     assert.equal(invalido.estado, null, 'CT-40: sem estado com gerador invalido');
-    assert.ok(typeof invalido.motivo === 'string' && invalido.motivo.length > 0,
-      'CT-40: motivo descritivo');
+    assert.equal(invalido.motivo, 'baralho invalido',
+      'CT-40: motivo exato para gerador invalido');
     assert.equal(criarPartida({ jogadorInicial: 1 }).estado.jogador, 1,
       'CT-40: jogadorInicial 1');
     assert.equal(criarPartida({ jogadorInicial: 2 }).valida, false,
@@ -1667,8 +1679,8 @@ verifica('CT-40', 'distribuicao reproduzivel com gerador fixo e erro com gerador
     const conflito = criarPartida({ baralho: baralhoValido, gerador: (d) => d });
     assert.equal(conflito.valida, false, 'CT-40: baralho e gerador sao exclusivos');
     assert.equal(conflito.estado, null, 'CT-40: sem estado com opcoes conflitantes');
-    assert.ok(typeof conflito.motivo === 'string' && conflito.motivo.length > 0,
-      'CT-40: motivo descritivo para opcoes conflitantes');
+    assert.equal(conflito.motivo, 'baralho invalido',
+      'CT-40: motivo exato para opcoes conflitantes');
   }
 });
 
@@ -7349,3 +7361,132 @@ verifica('CT-50', 'dupla jogada na perpendicular mantem as pontas',
     "orientacao": "perpendicular",
     "evento": "jogada"
   });
+
+// -------------------------------------------------------------------------
+// Extensao aditiva (CT-51 a CT-57): lacunas apontadas na revisao da suíte.
+// Nenhum caso anterior foi renumerado; os IDs novos continuam CT-51..57.
+// -------------------------------------------------------------------------
+
+verifica('CT-51', 'dupla encostada na ponta esquerda vai na perpendicular', {
+  maos: [[[1, 1], [0, 3]], [[3, 3], [1, 1]]],
+  monte: [[0, 0]],
+  mesa: [[1, 2], [2, 5]],
+  jogador: 0
+}, {
+  maos: [[[0, 3]], [[3, 3], [1, 1]]],
+  monte: [[0, 0]],
+  mesa: [[1, 1], [1, 2], [2, 5]],
+  jogador: 1,
+  vencedor: null,
+  evento: 'jogada',
+  peca: [1, 1],
+  motivo: 'jogada',
+  comprou: false,
+  orientacao: 'perpendicular'
+});
+
+test('CT-52 — baralho duplicado e baralho curto sao recusados', () => {
+  const canonico = [];
+  for (let a = 0; a <= 6; a++) {
+    for (let b = a; b <= 6; b++) canonico.push([a, b]);
+  }
+  const duplicado = canonico.map((p) => [...p]);
+  duplicado[27] = [0, 0];
+  const curto = canonico.slice(0, 27).map((p) => [...p]);
+  for (const [rotulo, baralho] of [['duplicado', duplicado], ['curto', curto]]) {
+    const antes = copia(baralho);
+    const saida = criarPartida({ baralho });
+    assert.equal(saida.valida, false, `CT-52: ${rotulo} valida`);
+    assert.equal(saida.estado, null, `CT-52: ${rotulo} estado`);
+    assert.equal(saida.motivo, 'baralho invalido', `CT-52: ${rotulo} motivo`);
+    assert.deepEqual(baralho, antes, `CT-52: ${rotulo} entrada intacta`);
+  }
+});
+
+test('CT-53 — gerador injetado e chamado exatamente uma vez', () => {
+  let chamadas = 0;
+  const gerador = (baralho) => {
+    chamadas++;
+    return [...baralho].reverse();
+  };
+  const saida = criarPartida({ gerador });
+  assert.equal(saida.valida, true, 'CT-53: valida');
+  assert.equal(chamadas, 1, 'CT-53: gerador chamado exatamente uma vez');
+});
+
+verifica('CT-54', 'criarPartida sem argumentos usa o baralho canonico', null, {
+  valida: true,
+  estado: {
+    maos: [
+      [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6]],
+      [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [2, 2]]
+    ],
+    monte: [
+      [2, 3], [2, 4], [2, 5], [2, 6],
+      [3, 3], [3, 4], [3, 5], [3, 6],
+      [4, 4], [4, 5], [4, 6],
+      [5, 5], [5, 6], [6, 6]
+    ],
+    mesa: [],
+    jogador: 0,
+    vencedor: null
+  },
+  motivo: ''
+}, { funcao: () => criarPartida() });
+
+verifica('CT-55', 'evento de entrada diferente de fim nao bloqueia o turno', {
+  maos: [[[2, 4], [1, 1]], [[3, 3], [0, 2]]],
+  monte: [[6, 6]],
+  mesa: [],
+  jogador: 0,
+  evento: 'passou',
+  vencedor: null
+}, {
+  maos: [[[1, 1]], [[3, 3], [0, 2]]],
+  monte: [[6, 6]],
+  mesa: [[2, 4]],
+  jogador: 1,
+  vencedor: null,
+  evento: 'jogada',
+  peca: [2, 4],
+  motivo: 'jogada',
+  comprou: false,
+  orientacao: 'linear'
+});
+
+verifica('CT-56', 'vencedor fora de 0/1/null e estado invalido', {
+  maos: [[[2, 4]], [[3, 3]]],
+  monte: [[6, 6]],
+  mesa: [],
+  jogador: 0,
+  vencedor: 2
+}, {
+  maos: [[[2, 4]], [[3, 3]]],
+  monte: [[6, 6]],
+  mesa: [],
+  jogador: 0,
+  vencedor: null,
+  evento: 'erro',
+  peca: null,
+  motivo: 'estado invalido',
+  comprou: false,
+  orientacao: null
+});
+
+test('CT-57 — todo erro usa uma string do vocabulario', () => {
+  const entradas = [
+    { maos: [[[7, 1]], [[3, 3]]], monte: [], mesa: [], jogador: 0 },
+    { maos: [[], [[3, 3]]], monte: [], mesa: [], jogador: 0 },
+    null
+  ];
+  const permitidos = new Set([
+    'jogada', 'sem joga', 'vitoria', 'bloqueio',
+    'estado invalido', 'mao vazia no inicio do turno', 'partida encerrada'
+  ]);
+  for (const entrada of entradas) {
+    const saida = jogarDomino(entrada);
+    assert.equal(saida.evento, 'erro', 'CT-57: evento erro');
+    assert.ok(permitidos.has(saida.motivo),
+      `CT-57: motivo fora do vocabulario: ${saida.motivo}`);
+  }
+});
