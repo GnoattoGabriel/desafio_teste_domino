@@ -25,20 +25,61 @@ if (typeof jogarDomino !== 'function') {
   };
 }
 
-const copia = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
+let criarPartida;
+try {
+  criarPartida = require('../src/domino').criarPartida;
+} catch (erro) {
+  const detalhe = (erro && (erro.stack || erro.message)) || String(erro);
+  criarPartida = () => {
+    throw new Error(
+      'Crie src/domino.js exportando criarPartida. ' + detalhe
+    );
+  };
+}
+if (typeof criarPartida !== 'function') {
+  criarPartida = () => { throw new Error('Exporte criarPartida de src/domino.js'); };
+}
 
-const verifica = (id, descricao, entrada, esperado) => {
+// Copia profunda que preserva NaN e funcoes (JSON.stringify corrompe ambos).
+const copia = (v) => {
+  if (typeof v === 'function' || v == null) return v;
+  if (Array.isArray(v)) return v.map(copia);
+  if (typeof v === 'object') {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, copia(x)]));
+  }
+  return v;
+};
+
+// opcoes.funcao troca a funcao testada (criarPartida); opcoes.passos encadeia
+// turnos de jogarDomino; opcoes.proximo extrai o estado inicial apos criarPartida;
+// opcoes.apos permite conferir chamadas adicionais dentro do mesmo caso.
+const verifica = (id, descricao, entrada, esperado, opcoes = {}) => {
   test(`${id} — ${descricao}`, () => {
     const estadoAntes = copia(entrada);
-    const saida = jogarDomino(entrada);
-    for (const [campo, valor] of Object.entries(esperado)) {
-      if (campo === 'motivo' && esperado.evento === 'erro') {
-        assert.equal(typeof saida.motivo, 'string', `${id}: motivo deve ser string`);
-        assert.ok(saida.motivo.length > 0, `${id}: motivo nao pode ser vazio`);
-      } else {
-        assert.deepEqual(saida[campo], valor, `${id}: campo ${campo}`);
+    const funcao = opcoes.funcao || jogarDomino;
+    const saida = funcao(entrada);
+    const checar = (atual, previsto) => {
+      for (const [campo, valor] of Object.entries(previsto)) {
+        if (campo === 'motivo' && previsto.evento === 'erro') {
+          assert.equal(typeof atual.motivo, 'string', `${id}: motivo deve ser string`);
+          assert.ok(atual.motivo.length > 0, `${id}: motivo nao pode ser vazio`);
+        } else {
+          assert.deepEqual(atual[campo], valor, `${id}: campo ${campo}`);
+        }
+      }
+    };
+    checar(saida, esperado);
+    if (opcoes.passos) {
+      let atual = opcoes.proximo ? opcoes.proximo(saida) : saida;
+      for (const passo of opcoes.passos) {
+        const objeto = atual;
+        const antesDoPasso = copia(objeto);
+        atual = jogarDomino(objeto);
+        checar(atual, passo);
+        assert.deepEqual(objeto, antesDoPasso, `${id}: turno encadeado nao pode alterar o estado recebido`);
       }
     }
+    if (opcoes.apos) opcoes.apos(saida);
     assert.deepEqual(entrada, estadoAntes, `${id}: estado recebido nao pode ser alterado`);
   });
 };
@@ -1102,7 +1143,7 @@ verifica('CT-31', 'bloquear apos compra sem encaixe que esvazia o monte', {
     ]
   ],
   monte: [
-    [0, 0]
+    [6, 6]
   ],
   mesa: [
     [1, 2],
@@ -1120,7 +1161,7 @@ verifica('CT-31', 'bloquear apos compra sem encaixe que esvazia o monte', {
     [
       [0, 3],
       [4, 6],
-      [0, 0]
+      [6, 6]
     ],
     [
       [0, 0],
@@ -1336,3 +1377,5965 @@ verifica('CT-38', 'jogar com a distribuicao completa 7 / 7 / 14', {
   motivo: 'jogada',
   comprou: false
 });
+
+// -------------------------------------------------------------------------
+// Extensao aditiva: distribuicao inicial, turnos encadeados, fim de partida,
+// duplas na perpendicular e validacoes adicionais (CT-39 a CT-50).
+// CT-01 a CT-38 permanecem com os mesmos IDs, dados e esperados; apenas o
+// monte do CT-31 foi corrigido para nao duplicar a dupla [0,0].
+// -------------------------------------------------------------------------
+
+verifica('CT-39', 'criarPartida entrega a distribuicao completa 7 / 7 / 14', {}, {
+  "valida": true,
+  "estado": {
+    "maos": [
+      [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ]
+    ],
+    "mesa": [],
+    "jogador": 0,
+    "vencedor": null
+  },
+  "motivo": ""
+}, { funcao: criarPartida });
+
+verifica('CT-40', 'distribuicao reproduzivel com gerador fixo e erro com gerador invalido',
+  { gerador: (d) => [...d].reverse() },
+  {
+    "valida": true,
+    "estado": {
+      "maos": [
+        [
+          [
+            6,
+            6
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            5,
+            5
+          ],
+          [
+            4,
+            6
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            3,
+            6
+          ]
+        ],
+        [
+          [
+            3,
+            5
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            2,
+            5
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            3
+          ]
+        ]
+      ],
+      "monte": [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "mesa": [],
+      "jogador": 0,
+      "vencedor": null
+    },
+    "motivo": ""
+  }, {
+  funcao: criarPartida,
+  apos: (saida) => {
+    assert.deepEqual(criarPartida({ gerador: (d) => [...d].reverse() }).estado,
+      saida.estado, 'CT-40: o mesmo gerador reparte as mesmas maos e o mesmo monte');
+    const invalido = criarPartida({ gerador: null });
+    assert.equal(invalido.valida, false, 'CT-40: gerador invalido');
+    assert.equal(invalido.estado, null, 'CT-40: sem estado com gerador invalido');
+    assert.ok(typeof invalido.motivo === 'string' && invalido.motivo.length > 0,
+      'CT-40: motivo descritivo');
+    assert.equal(criarPartida({ jogadorInicial: 1 }).estado.jogador, 1,
+      'CT-40: jogadorInicial 1');
+    assert.equal(criarPartida({ jogadorInicial: 2 }).valida, false,
+      'CT-40: jogadorInicial fora de 0/1');
+  }
+});
+
+verifica('CT-41', 'comprar apenas a primeira peca do monte quando a segunda encaixaria',
+  { maos: [[[0,3],[4,6]], [[3,3],[1,1]]], monte: [[0,0],[5,5]],
+  mesa: [[1,2],[2,5]], jogador: 0 },
+  {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ],
+        [
+          1,
+          1
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        5,
+        5
+      ]
+    ],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  });
+
+verifica('CT-42', 'comprar e encaixar na ponta direita invertendo a peca',
+  { maos: [[[0,3],[4,6]], [[3,3],[1,1]]], monte: [[3,5],[0,0]],
+  mesa: [[1,2],[2,5]], jogador: 0 },
+  {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ],
+        [
+          1,
+          1
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        3
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      3
+    ],
+    "motivo": "jogada",
+    "comprou": true,
+    "orientacao": "linear",
+    "evento": "jogada"
+  });
+
+verifica('CT-43', 'bloquear com o jogador 1 na vez (simetria dos CT-14 e CT-15)',
+  { maos: [[[0,3],[4,6]], [[0,0],[3,4]]], monte: [],
+  mesa: [[1,2],[2,5]], jogador: 1 },
+  {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      [
+        [
+          0,
+          0
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    ],
+    "monte": [],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": 1,
+    "peca": null,
+    "motivo": "bloqueio",
+    "comprou": false,
+    "orientacao": null,
+    "evento": "fim"
+  });
+
+verifica('CT-44', 'passagem seguida da jogada do adversario',
+  { maos: [[[0,3],[4,6]], [[5,4],[3,3]]], monte: [],
+  mesa: [[1,2],[2,5]], jogador: 0 },
+  {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      [
+        [
+          5,
+          4
+        ],
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": false,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  { passos: [      {
+          "maos": [
+            [
+              [
+                0,
+                3
+              ],
+              [
+                4,
+                6
+              ]
+            ],
+            [
+              [
+                3,
+                3
+              ]
+            ]
+          ],
+          "monte": [],
+          "mesa": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              5
+            ],
+            [
+              5,
+              4
+            ]
+          ],
+          "jogador": 0,
+          "vencedor": null,
+          "peca": [
+            5,
+            4
+          ],
+          "motivo": "jogada",
+          "comprou": false,
+          "orientacao": "linear",
+          "evento": "jogada"
+        }] });
+
+const baralho45 = [
+  [
+    6,
+    6
+  ],
+  [
+    5,
+    6
+  ],
+  [
+    5,
+    5
+  ],
+  [
+    4,
+    6
+  ],
+  [
+    4,
+    5
+  ],
+  [
+    4,
+    4
+  ],
+  [
+    3,
+    6
+  ],
+  [
+    3,
+    5
+  ],
+  [
+    3,
+    4
+  ],
+  [
+    3,
+    3
+  ],
+  [
+    2,
+    6
+  ],
+  [
+    2,
+    5
+  ],
+  [
+    2,
+    4
+  ],
+  [
+    2,
+    3
+  ],
+  [
+    2,
+    2
+  ],
+  [
+    1,
+    6
+  ],
+  [
+    1,
+    5
+  ],
+  [
+    1,
+    4
+  ],
+  [
+    1,
+    3
+  ],
+  [
+    1,
+    2
+  ],
+  [
+    1,
+    1
+  ],
+  [
+    0,
+    6
+  ],
+  [
+    0,
+    5
+  ],
+  [
+    0,
+    4
+  ],
+  [
+    0,
+    3
+  ],
+  [
+    0,
+    2
+  ],
+  [
+    0,
+    1
+  ],
+  [
+    0,
+    0
+  ]
+];
+const passos45 = [
+  {
+    "maos": [
+      [
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          3,
+          6
+        ]
+      ],
+      [
+        [
+          3,
+          5
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        6,
+        6
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      6,
+      6
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          3,
+          6
+        ]
+      ],
+      [
+        [
+          3,
+          5
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      6,
+      2
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          3,
+          6
+        ]
+      ],
+      [
+        [
+          3,
+          5
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      6
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          3,
+          6
+        ]
+      ],
+      [
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      3,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      6,
+      3
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          5,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      2,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "perpendicular",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      4,
+      6
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      3,
+      4
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        4
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      4
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        4
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      3,
+      3
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "perpendicular",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [],
+      [
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        4
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": 0,
+    "peca": [
+      4,
+      4
+    ],
+    "motivo": "vitoria",
+    "comprou": false,
+    "orientacao": "perpendicular",
+    "evento": "fim"
+  }
+];
+
+verifica('CT-45', 'partida completa ate vitoria por esgotar a mao',
+  { baralho: baralho45 },
+  {
+    "valida": true,
+    "estado": {
+      "maos": [
+        [
+          [
+            6,
+            6
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            5,
+            5
+          ],
+          [
+            4,
+            6
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            3,
+            6
+          ]
+        ],
+        [
+          [
+            3,
+            5
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            2,
+            5
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            3
+          ]
+        ]
+      ],
+      "monte": [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "mesa": [],
+      "jogador": 0,
+      "vencedor": null
+    },
+    "motivo": ""
+  },
+  { funcao: criarPartida, proximo: (saida) => saida.estado, passos: passos45 });
+
+const baralho46 = [
+  [
+    1,
+    6
+  ],
+  [
+    2,
+    2
+  ],
+  [
+    1,
+    1
+  ],
+  [
+    0,
+    2
+  ],
+  [
+    0,
+    4
+  ],
+  [
+    5,
+    6
+  ],
+  [
+    0,
+    6
+  ],
+  [
+    1,
+    5
+  ],
+  [
+    4,
+    5
+  ],
+  [
+    2,
+    3
+  ],
+  [
+    1,
+    4
+  ],
+  [
+    4,
+    6
+  ],
+  [
+    0,
+    5
+  ],
+  [
+    1,
+    2
+  ],
+  [
+    4,
+    4
+  ],
+  [
+    1,
+    3
+  ],
+  [
+    5,
+    5
+  ],
+  [
+    6,
+    6
+  ],
+  [
+    2,
+    5
+  ],
+  [
+    3,
+    5
+  ],
+  [
+    3,
+    6
+  ],
+  [
+    2,
+    6
+  ],
+  [
+    3,
+    4
+  ],
+  [
+    3,
+    3
+  ],
+  [
+    0,
+    3
+  ],
+  [
+    2,
+    4
+  ],
+  [
+    0,
+    0
+  ],
+  [
+    0,
+    1
+  ]
+];
+const passos46 = [
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          1,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        1,
+        6
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      1,
+      6
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      5,
+      1
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      6,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      5,
+      4
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      4,
+      0
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      0,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        1,
+        3
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": true,
+    "orientacao": "perpendicular",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      2
+    ],
+    "motivo": "jogada",
+    "comprou": true,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": [
+      2,
+      3
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      3,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": true,
+    "orientacao": "linear",
+    "evento": "jogada"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        3,
+        3
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          0,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        2,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          0,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          0
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        1
+      ]
+    ],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "peca": null,
+    "motivo": "sem joga",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "passou"
+  },
+  {
+    "maos": [
+      [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          0
+        ]
+      ]
+    ],
+    "monte": [],
+    "mesa": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": 0,
+    "peca": null,
+    "motivo": "bloqueio",
+    "comprou": true,
+    "orientacao": null,
+    "evento": "fim"
+  }
+];
+
+verifica('CT-46', 'partida completa ate bloqueio com o monte esgotado',
+  { baralho: baralho46 },
+  {
+    "valida": true,
+    "estado": {
+      "maos": [
+        [
+          [
+            1,
+            6
+          ],
+          [
+            2,
+            2
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            0,
+            6
+          ]
+        ],
+        [
+          [
+            1,
+            5
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            4
+          ],
+          [
+            4,
+            6
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      ],
+      "monte": [
+        [
+          4,
+          4
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "mesa": [],
+      "jogador": 0,
+      "vencedor": null
+    },
+    "motivo": ""
+  },
+  { funcao: criarPartida, proximo: (saida) => saida.estado, passos: passos46 });
+
+verifica('CT-47', 'chamada apos fim de partida devolve erro',
+    {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      [
+        [
+          0,
+          0
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    ],
+    "monte": [],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": 1,
+    "peca": null,
+    "motivo": "bloqueio",
+    "comprou": false,
+    "orientacao": null,
+    "evento": "fim"
+  },
+  {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      [
+        [
+          0,
+          0
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    ],
+    "monte": [],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": 1,
+    "evento": "erro",
+    "peca": null,
+    "motivo": "partida encerrada",
+    "comprou": false,
+    "orientacao": null
+  });
+
+verifica('CT-48', 'monte nao array',
+    {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": "vazio",
+    "mesa": [],
+    "jogador": 0
+  },
+  {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": null,
+    "mesa": [],
+    "jogador": 0,
+    "vencedor": null,
+    "evento": "erro",
+    "peca": null,
+    "motivo": "estado invalido",
+    "comprou": false,
+    "orientacao": null
+  });
+
+verifica('CT-48', 'mesa nao array',
+    {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": "vazia",
+    "jogador": 0
+  },
+  {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": null,
+    "jogador": 0,
+    "vencedor": null,
+    "evento": "erro",
+    "peca": null,
+    "motivo": "estado invalido",
+    "comprou": false,
+    "orientacao": null
+  });
+
+verifica('CT-48', 'peca invalida no monte',
+    {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        7,
+        1
+      ]
+    ],
+    "mesa": [],
+    "jogador": 0
+  },
+  {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        7,
+        1
+      ]
+    ],
+    "mesa": [],
+    "jogador": 0,
+    "vencedor": null,
+    "evento": "erro",
+    "peca": null,
+    "motivo": "estado invalido",
+    "comprou": false,
+    "orientacao": null
+  });
+
+verifica('CT-48', 'peca invalida na mesa',
+    {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        1,
+        -2
+      ]
+    ],
+    "jogador": 0
+  },
+  {
+    "maos": [
+      [
+        [
+          1,
+          2
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        1,
+        -2
+      ]
+    ],
+    "jogador": 0,
+    "vencedor": null,
+    "evento": "erro",
+    "peca": null,
+    "motivo": "estado invalido",
+    "comprou": false,
+    "orientacao": null
+  });
+
+verifica('CT-49', 'mao vazia no inicio do turno e estado invalido',
+    {
+    "maos": [
+      [],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [],
+    "jogador": 0
+  },
+  {
+    "maos": [
+      [],
+      [
+        [
+          3,
+          3
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [],
+    "jogador": 0,
+    "vencedor": null,
+    "evento": "erro",
+    "peca": null,
+    "motivo": "mao vazia no inicio do turno",
+    "comprou": false,
+    "orientacao": null
+  });
+
+verifica('CT-50', 'dupla jogada na perpendicular mantem as pontas',
+  { maos: [[[5,5],[0,3]], [[3,3],[1,1]]], monte: [[0,0]],
+    mesa: [[1,2],[2,5]], jogador: 0 },
+  {
+    "maos": [
+      [
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        [
+          3,
+          3
+        ],
+        [
+          1,
+          1
+        ]
+      ]
+    ],
+    "monte": [
+      [
+        0,
+        0
+      ]
+    ],
+    "mesa": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    "jogador": 1,
+    "vencedor": null,
+    "peca": [
+      5,
+      5
+    ],
+    "motivo": "jogada",
+    "comprou": false,
+    "orientacao": "perpendicular",
+    "evento": "jogada"
+  });

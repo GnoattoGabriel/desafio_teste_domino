@@ -32,7 +32,9 @@ verificáveis. Foram confirmadas antes da escrita e estão registradas aqui e no
   maos: [ [[0,1],[2,2],...], [[3,4],[5,5],...] ], // mãos dos jogadores 0 e 1
   monte: [ [6,6],[1,3],... ],                      // peças disponíveis à esquerda
   mesa:  [ [2,4],[4,0],... ] | [],                 // fileira jogada; vazia no início
-  jogador: 0 | 1                                   // jogador da vez
+  jogador: 0 | 1,                                  // jogador da vez
+  vencedor: 0 | 1 | null,                          // preenchido no fim
+  evento: 'jogada' | 'passou' | 'fim' | 'erro'      // presente ao encadear turnos
 }
 ```
 
@@ -40,8 +42,11 @@ verificáveis. Foram confirmadas antes da escrita e estão registradas aqui e no
   (direita). Com a mesa vazia, qualquer peça pode ser a primeira.
 - Cada peça é um par `[a, b]` de números inteiros de `0` a `6`. `[a,b]` e `[b,a]`
   são a **mesma peça**: a orientação é escolhida no momento do encaixe.
-- Duplas `[x,x]` são armazenadas na mesa como `[x,x]` e mantêm as duas pontas
-  em `x`. O contrato é plano e não representa orientação espacial.
+- Duplas `[x,x]` são armazenadas na mesa como `[x,x]`. Quando a dupla encaixa
+  numa ponta `x`, ela é considerada **colocada na perpendicular**: a ponta
+  atingida continua `x` e o retorno inclui `orientacao: 'perpendicular'`. Na
+  primeira peça (mesa vazia) e nas peças comuns, `orientacao` é `'linear'`. A
+  peça continua plana; a orientação é um metadado do retorno (CT-50).
 
 ### 1.3 Regras de turno
 
@@ -63,6 +68,11 @@ verificáveis. Foram confirmadas antes da escrita e estão registradas aqui e no
    jogador também não tem jogada, a partida termina. Vence quem tiver a **menor
    soma de pontos** nas peças restantes; empate na soma = empate.
 7. A função **não altera** o estado recebido.
+8. **Fim de partida:** após `evento: 'fim'`, a função não processa outro turno;
+   devolve `{ evento: 'erro', motivo: 'partida encerrada', ... }` sem alterar
+   nada (CT-47).
+9. **Mão vazia:** uma mão vazia no início do turno é estado inválido — a
+   partida já deveria ter terminado por vitória (CT-49).
 
 **Vitória com peça comprada é impossível** sob estas regras: a compra acrescenta
 uma peça à mão e a jogada remove uma, de modo que a mão só esvazia se já estivesse
@@ -87,6 +97,7 @@ const { jogarDomino } = require('./src/domino');
 | `vencedor` | 0 \| 1 \| `null` | vencedor, somente em `fim` |
 | `motivo` | string | `'jogada'`, `'sem joga'`, `'vitoria'`, `'bloqueio'` ou descrição de erro |
 | `comprou` | boolean | se houve compra do monte neste turno |
+| `orientacao` | `'linear'` \| `'perpendicular'` \| `null` | como a peça foi encaixada; dupla na perpendicular |
 
 Em `evento: 'fim'`, o campo `jogador` permanece com o índice de quem causou o
 fim (não avança), pois a partida terminou.
@@ -94,6 +105,28 @@ fim (não avança), pois a partida terminou.
 Um **estado inválido** (campos ausentes, tipos errados, peça fora de `0..6`,
 `jogador` diferente de `0`/`1`) devolve `{ evento: 'erro', motivo: <string> }`
 e não altera nada.
+
+### 1.5 Distribuição inicial
+
+```js
+const { criarPartida, jogarDomino } = require('./src/domino');
+const { valida, estado, motivo } = criarPartida({ baralho, gerador, jogadorInicial });
+```
+
+- `baralho`: opcional, as 28 peças em **ordem fixa**. As primeiras 7 formam a
+  mão 0, as seguintes 7 a mão 1 e as 14 restantes o monte (CT-38, CT-39).
+- `gerador`: alternativa a `baralho`; função `(baralhoCanonico) => baralho`,
+  chamada uma única vez. `baralho` e `gerador` são mutuamente exclusivos.
+  Gerador que não é função, baralho com tamanho/peças inválidos ou peças
+  repetidas produzem `valida: false`, `estado: null` e `motivo` descritivo
+  (CT-40).
+- `jogadorInicial`: `0` (padrão) ou `1`; qualquer outro valor é erro (CT-40).
+- Sem opções, usa o baralho canônico ordenado de `[0,0]` a `[6,6]`. Não há
+  `Math.random`, relógio nem sorteio: o mesmo gerador sempre entrega a mesma
+  distribuição (CT-40).
+- O `estado` devolvido contém `maos`, `monte`, `mesa: []`, `jogador` e
+  `vencedor: null`. Para encadear turnos, use `estado = jogarDomino(estado)`:
+  o retorno já traz todos os campos do estado (CT-44 a CT-46).
 
 ## 2. Funcionamento dos casos de teste
 
@@ -104,7 +137,7 @@ template oficial (`aulas/SEMANA 02/docs/Caso de Teste.docx`). Cada caso contém
 Teste** e **Resultado Esperado**, e **Pós-condições**.
 
 Cada caso tem um teste equivalente em `test/domino.test.js`, com o mesmo ID
-(CT-01 a CT-38). O `.docx` é a especificação legível; o `.js` é a versão
+(CT-01 a CT-50). O `.docx` é a especificação legível; o `.js` é a versão
 executável, atendendo a exigência "casos de teste em Javascript para testar
 Javascript".
 
@@ -150,6 +183,18 @@ Javascript".
 | CT-36 | Peça com `NaN` | `erro` |
 | CT-37 | Peça com booleano | `erro` |
 | CT-38 | Distribuição completa 7 / 7 / 14 | `jogada` |
+| CT-39 | `criarPartida()` padrão: 7 / 7 / 14, 28 peças únicas | `valida: true` |
+| CT-40 | Gerador fixo reproduzível; gerador e `jogadorInicial` inválidos | `valida: true` / erro |
+| CT-41 | Uma compra por turno, mesmo com a 2ª peça encaixando | `passou` |
+| CT-42 | Compra que encaixa à direita invertendo | `jogada` |
+| CT-43 | Bloqueio com jogador 1 na vez | `fim` / `bloqueio` |
+| CT-44 | Passagem seguida da jogada do adversário | `passou` → `jogada` |
+| CT-45 | Partida completa até vitória | `fim` / `vitoria` |
+| CT-46 | Partida completa até bloqueio | `fim` / `bloqueio` |
+| CT-47 | Turno após `evento: 'fim'` | `erro` |
+| CT-48 | `monte`/`mesa` não-array e peças inválidas nesses campos | `erro` |
+| CT-49 | Mão vazia no início do turno | `erro` |
+| CT-50 | Dupla jogada na perpendicular | `jogada` / `perpendicular` |
 
 ### Cobertura das regras
 
@@ -167,27 +212,44 @@ Javascript".
 | Não mutação | CT-16 (e verificação automática em todos os casos) |
 | Caminho válido independente | CT-17 |
 | Distribuição 7 / 7 / 14 | CT-38 |
-| Validação de estado | CT-18 a CT-28, CT-32 a CT-37 |
+| Validação de estado | CT-18 a CT-28, CT-32 a CT-37, CT-48, CT-49 |
+| Distribuição determinística | CT-39, CT-40 |
+| Uma compra por turno | CT-41 |
+| Compra invertendo à direita | CT-42 |
+| Simetria do jogador 1 | CT-13, CT-43 |
+| Partida encadeada | CT-44, CT-45, CT-46 |
+| Pós-fim | CT-47 |
+| Duplas na perpendicular | CT-06, CT-50 |
 
 ### Casos executáveis em JavaScript
 
 - **Runner:** `node --test` (nativo do Node.js 18+), sem dependências.
 - **Executar:** `npm test` na raiz do repositório.
-- **Situação atual:** os 38 testes existem e falham (`# fail 38`) com a mensagem
-  "Crie src/domino.js exportando jogarDomino" seguida do erro real de carregamento
-  (stack), para não esconder falhas no `require`. Esse é o estado **RED** esperado:
-  a IA deve gerar a implementação a partir dos casos, sem que este repositório
-  entregue o código do jogo.
-- **Determinismo:** nenhum caso usa `Math.random`, sorteio ou tempo. Todos os
-  dados (mãos, monte, mesa e jogador) estão fixos no próprio caso.
+- **Situação atual:** os 50 casos viram 53 testes (CT-48 tem quatro linhas) e
+  falham: `# tests 53`, `# pass 0`, `# fail 53`. Esse é o estado **RED**
+  esperado: a implementação do jogo não faz parte deste entregável. As mensagens
+  citam `src/domino.js` e trazem o `stack` real de carregamento.
+- **Ciclo TDD:** o RED é registrado neste repositório; o GREEN (53/53) e a
+  refatoração foram executados em cópia descartável com implementação de
+  referência e variantes defeituosas (compra múltipla, distribuição alternada,
+  turno pós-fim, ausência de `orientacao`, mão vazia aceita). Nenhuma
+  implementação foi deixada aqui.
+- **Determinismo:** nenhum caso usa `Math.random`, sorteio ou tempo. As mãos, o
+  monte, a mesa e o jogador estão fixos no caso; quando a distribuição é
+  necessária, o baralho é explícito ou vem de um gerador injetado com sequência
+  fixa (CT-40, CT-45, CT-46).
+- **Correção do helper:** `copia` preserva `NaN` e funções. O `JSON.stringify`
+  original convertia `NaN` em `null` e já fazia o CT-36 falhar mesmo com a
+  implementação correta; a nova cópia também permite injetar `gerador`.
 
 ### Premissas que podem ser revisadas
 
 Se o professor adotar outra variante, estes pontos precisam mudar em conjunto:
 número de peças e tamanho das mãos (1.1, exercitado no CT-38 com as 28 peças),
-ordem de prioridade do encaixe (1.3.2), compra de uma peça por turno (1.3.3) e
-critério de bloqueio (1.3.6). A representação plana da dupla (1.2) decorre do
-contrato e não depende da variante.
+ordem de prioridade do encaixe (1.3.2), compra de uma peça por turno (1.3.3),
+critério de bloqueio (1.3.6) e o metadado `orientacao` das duplas (1.2 e CT-50).
+O monte do CT-31 foi corrigido para `[6,6]`: o baralho double-six tem cada peça
+uma única vez; o bloqueio e o vencedor 1 foram preservados (somas 25 e 7).
 
 ## 3. Estrutura do repositório
 
